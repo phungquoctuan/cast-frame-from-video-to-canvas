@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HW3 - Canvas Video Demo</title>
+    <style>
+        video,
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 2px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- video -->
+    <video id="video" width="640" height="360" controls>
+        <!-- Hiển thị nếu trình duyệt không hỗ trợ thẻ video -->
+        <source src="video.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <canvas id="canvas" width="640" height="360"></canvas>
+
+    <script>
+        // Hàm xử lý Sobel Operator
+        function sobelOperator(data, width, height) {
+            var outputData = new Uint8ClampedArray(data.length);
+
+            // Sobel Operator
+            var kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+            var kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+            var sobelThreshold = 50; // Ngưỡng Sobel
+
+            // Hàm lấy giá trị pixel tại vị trí (x, y)
+            function getPixel(x, y) {
+                if (x < 0 || y < 0 || x >= width || y >= height) {
+                    return 0;
+                }
+                return data[(y * width + x) * 4];
+            }
+
+            // Hàm áp dụng kernel Sobel Operator tại vị trí (x, y)
+            function applyKernel(x, y) {
+                var sumX = 0;
+                var sumY = 0;
+                for (var i = 0; i < 3; i++) {
+                    for (var j = 0; j < 3; j++) {
+                        var pixelX = x + i - 1;
+                        var pixelY = y + j - 1;
+                        var pixelValue = getPixel(pixelX, pixelY);
+                        sumX += kernelX[i * 3 + j] * pixelValue;
+                        sumY += kernelY[i * 3 + j] * pixelValue;
+                    }
+                }
+                return Math.sqrt(sumX * sumX + sumY * sumY);
+            }
+
+            // Duyệt qua từng pixel và áp dụng Sobel Operator
+            for (var y = 0; y < height; y++) {
+                for (var x = 0; x < width; x++) {
+                    var pixel = applyKernel(x, y);
+                    var index = (y * width + x) * 4;
+                    if (pixel > sobelThreshold) {
+                        outputData[index] = outputData[index + 1] = outputData[index + 2] = 255;
+                    } else {
+                        outputData[index] = outputData[index + 1] = outputData[index + 2] = 0;
+                    }
+                    outputData[index + 3] = 255; // Alpha channel
+                }
+            }
+
+            return outputData;
+        }
+
+        // Hàm xử lý khi trang web tải xong
+        window.onload = function () {
+            var video = document.getElementById('video');
+            var canvas = document.getElementById('canvas');
+            var context = canvas.getContext('2d');
+
+            // Event listener khi video playback chạy
+            video.addEventListener('play', function () {
+                var $this = this; // Lưu trữ tham chiếu của video
+                (function loop() {
+                    if (!$this.paused && !$this.ended) {
+                        // Vẽ frame hình từ video lên canvas
+                        context.drawImage($this, 0, 0, canvas.width, canvas.height);
+
+                        // Lấy dữ liệu pixel của canvas
+                        var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                        var pixels = imageData.data;
+
+                        // Xử lý pixel để tạo hình ảnh biên cạnh bằng Sobel Operator
+                        var edgeData = sobelOperator(pixels, canvas.width, canvas.height);
+
+                        // Đặt lại dữ liệu pixel đã xử lý vào canvas
+                        context.putImageData(new ImageData(edgeData, canvas.width, canvas.height), 0, 0);
+
+                        // Refresh canvas sau mỗi frame
+                        requestAnimationFrame(loop);
+                    }
+                })();
+            }, 0);
+        };
+    </script>
+</body>
+
+</html>
